@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+ <!-- 
+ 	[참고 사이트] 마이바티스
+ 	https://mybatis.org/mybatis-3/ko/gettiong-started.html
+ 	
+ 	마이바티스는 무엇인가요?
+ 	- 마이바티스는 개발자가 지정한 SQL, 저장 프로시저 그리고 몇가지 고급 매핑을 지원하는 퍼시스턴스 프레임워크입니다.
+ 	마이바티스는 JDBC로 처리하는 상당 부분의 코드와 파라미터 설정 및 결과 매핑을 대신해줍니다.
+ 	마이바티스는 데이터베이스 레코드에 원시타입과 Map 인터페이스 그리고 자바 POJO를 설정해서 매핑하기 위해 XML과 어노테이션을 사용할 수 있습니다.
+ 	
+ 	*** POJO란?
+ 	- POJO(plain Old Java Object)란, 순수한 자바 객체를 말한다.
+ 	그리고, 객체지향적인 원리에 충실하면서 환경과 기술에 종속되지 않고 필요에 따라 재활용 될 수 있는 방식으로 설계된 오브젝트
+ 	객체지향 원리를 기반으로 설계된 오브젝트(getter/setter를 이용한 VO들)
+ 	
+ 	namespace 항목은 쿼리가 여러 개일 때 이름 공간(namespace)을 분리하는 역할을 한다.
+ 	쿼리 XML파일은 보통 여러 개 생성되기 때문에 이를 구별하는 용도로 사용합니다.
+  -->
+  
+  <mapper namespace="Notice">
+  
+	<sql id="noticeSearch">
+		<if test="searchType != null and searchType == 'title'">
+			and (notice_title like '%' || #{searchWord}||'%')
+		</if>
+		<if test="searchType != null and searchType == 'writer'">
+			and (notice_writer like '%' || #{searchWord}||'%')
+		</if>
+	</sql>
+  
+  	
+	<insert id="insertNotice" parameterType="noticeVO" useGeneratedKeys="true">
+	<selectKey keyProperty="noticeNo" resultType="int" order="BEFORE">
+		select seq_notice.nextval from dual 
+	</selectKey>
+		insert into notice(
+			notice_no,notice_title,notice_content,notice_writer,notice_date,notice_hit
+		)values(
+			#{noticeNo},#{noticeTitle},#{noticeContent},#{noticeWriter},sysdate,0
+		)
+	</insert>
+  
+  	<select id="selectNoticeCount" parameterType="pagingVO" resultType="int">
+		select count(notice_no)
+		from notice
+		where 1=1
+		<include refid="noticeSearch"/>
+	</select>
+	
+	<select id="selectNoticeList" parameterType="pagingVO" resultType="noticeVO">
+		select
+			b.*
+		from(
+			select
+				a.*,row_number() over(order by a.notice_no desc) rnum
+			from(
+				select
+					notice_no,notice_title,notice_content,notice_writer,notice_date,notice_hit
+				from notice
+				where 1=1
+				<include refid="noticeSearch"/>
+				order by notice_no desc
+			) a
+		)b
+		<![CDATA[
+		where b.rnum >= #{startRow} and b.rnum <= #{endRow}
+		]]>
+	</select>
+  
+  	<select id="selectNotice" parameterType="int" resultType="noticeVO">
+		select
+			notice_no,notice_title,notice_content,notice_writer,notice_date,notice_hit
+		from notice
+		where notice_no = #{noticeNo}
+	</select>
+	
+	<!-- 조회수 증가 쿼리 -->	
+	<update id="incrementHit" parameterType="int">
+		update notice
+		set
+			notice_hit = notice_hit + 1
+		where notice_no = #{noticeNo}
+	</update>	
+  
+	<update id="updateNotice" parameterType="noticeVO">
+		update notice
+		set
+			notice_title = #{noticeTitle},
+			notice_content = #{noticeContent},
+			notice_date = sysdate
+		where notice_no = #{noticeNo}
+			
+	</update>
+  
+	<delete id="deleteNotice" parameterType="int">
+		delete from notice
+		where notice_no = #{noticeNo}
+	</delete>
+  
+  </mapper>
